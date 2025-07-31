@@ -425,6 +425,7 @@
         function isPartialMatch(input, pattern) {
             if (input.length >= pattern.length) return false;
 
+            // Check if the input matches the beginning of the pattern
             for (let i = 0; i < input.length; i++) {
                 if (pattern[i] === '.') {
                     // Wildcard matches any character
@@ -433,7 +434,14 @@
                     return false;
                 }
             }
-            return true;
+            
+            // Now check if this is exactly one level deeper
+            // Count dashes in input vs pattern to determine hierarchy levels
+            const inputDashes = (input.match(/-/g) || []).length;
+            const patternDashes = (pattern.match(/-/g) || []).length;
+            
+            // Only show patterns that are exactly one level deeper (one more dash)
+            return patternDashes === inputDashes + 1;
         }
 
         // Get parent COT code by removing the last segment (letter and dash)
