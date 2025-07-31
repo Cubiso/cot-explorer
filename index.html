@@ -117,7 +117,8 @@
 
         .result-item {
             padding: 20px;
-            border-bottom: 1px solid #f0f0f0;
+            border-bottom: 1px solid #e0e0e0;
+            position: relative;
         }
 
         .result-item:last-child {
@@ -160,6 +161,50 @@
             color: #888;
             font-style: italic;
             font-size: 0.95rem;
+        }
+
+        .result-actions {
+            position: absolute;
+            top: 15px;
+            right: 15px;
+            display: flex;
+            gap: 8px;
+        }
+
+        .action-btn {
+            padding: 4px 8px;
+            font-size: 0.8rem;
+            border: 1px solid #ddd;
+            background: white;
+            border-radius: 4px;
+            cursor: pointer;
+            color: #666;
+            transition: all 0.2s ease;
+        }
+
+        .action-btn:hover {
+            border-color: #667eea;
+            color: #667eea;
+            background: rgba(102, 126, 234, 0.05);
+        }
+
+        .toast {
+            position: fixed;
+            bottom: 20px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: #333;
+            color: white;
+            padding: 12px 20px;
+            border-radius: 6px;
+            font-size: 0.9rem;
+            z-index: 1000;
+            opacity: 0;
+            transition: opacity 0.3s ease;
+        }
+
+        .toast.show {
+            opacity: 1;
         }
 
 
@@ -224,9 +269,61 @@
         </div>
     </div>
 
+    <div class="toast" id="toast"></div>
+
     <script>
         let cotData = [];
         let isLoading = false;
+        let currentQuery = '';
+
+        // Show toast notification
+        function showToast(message) {
+            const toast = document.getElementById('toast');
+            toast.textContent = message;
+            toast.classList.add('show');
+            setTimeout(() => {
+                toast.classList.remove('show');
+            }, 1500);
+        }
+
+        // Substitute dots in COT pattern with actual characters from current query
+        function substituteDots(pattern, userInput) {
+            let result = '';
+            for (let i = 0; i < pattern.length; i++) {
+                if (pattern[i] === '.' && i < userInput.length) {
+                    result += userInput[i];
+                } else {
+                    result += pattern[i];
+                }
+            }
+            return result;
+        }
+
+        // Copy to clipboard
+        async function copyToClipboard(text) {
+            try {
+                await navigator.clipboard.writeText(text);
+                showToast(`Copied "${text}" to clipboard`);
+            } catch (err) {
+                // Fallback for older browsers
+                const textArea = document.createElement('textarea');
+                textArea.value = text;
+                document.body.appendChild(textArea);
+                textArea.select();
+                document.execCommand('copy');
+                document.body.removeChild(textArea);
+                showToast(`Copied "${text}" to clipboard`);
+            }
+        }
+
+        // Search for a specific COT code
+        function searchForCode(cotCode) {
+            const input = document.getElementById('cotInput');
+            input.value = cotCode;
+            input.focus();
+            handleInput();
+            showToast(`Searching for "${cotCode}"`);
+        }
 
         // Load and parse XML data
         async function loadCOTData() {
@@ -284,6 +381,7 @@
 
             const matches = [];
             const inputTrimmed = input.trim();
+            currentQuery = inputTrimmed; // Store current query for dot substitution
             console.log('Searching for:', inputTrimmed);
 
             for (const cot of cotData) {
@@ -361,13 +459,20 @@
                 // Show partial matches in extensions block
                 if (partialMatches.length > 0) {
                     extensionsHeader.textContent = `More specific options (${partialMatches.length})`;
-                    extensionsList.innerHTML = partialMatches.map(match => `
-                        <div class="result-item">
-                            <div class="cot-code">${match.cot}</div>
-                            <div class="cot-desc">${match.desc}</div>
-                            ${match.full ? `<div class="cot-full">${match.full}</div>` : ''}
-                        </div>
-                    `).join('');
+                    extensionsList.innerHTML = partialMatches.map(match => {
+                        const substitutedCode = substituteDots(match.cot, currentQuery);
+                        return `
+                            <div class="result-item">
+                                <div class="cot-code">${match.cot}</div>
+                                <div class="cot-desc">${match.desc}</div>
+                                ${match.full ? `<div class="cot-full">${match.full}</div>` : ''}
+                                <div class="result-actions">
+                                    <button class="action-btn" onclick="searchForCode('${substitutedCode}')" title="Drill down into this code">⬇️ Drill down</button>
+                                    <button class="action-btn" onclick="copyToClipboard('${substitutedCode}')" title="Copy to clipboard">📋 Copy</button>
+                                </div>
+                            </div>
+                        `;
+                    }).join('');
                     extensionsDiv.style.display = 'block';
                 } else {
                     extensionsDiv.style.display = 'none';
