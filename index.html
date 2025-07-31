@@ -249,9 +249,6 @@
             <div class="input-group">
                 <label for="cotInput">Enter COT Code:</label>
                 <input type="text" id="cotInput" placeholder="a-f-A-M-F-C-H" autocomplete="off" spellcheck="false">
-                <div class="example">
-                    Example: "a-f-A-M-F-C-H" represents a heavy airlift cargo plane
-                </div>
             </div>
         </div>
 
@@ -434,12 +431,12 @@
                     return false;
                 }
             }
-            
+
             // Now check if this is exactly one level deeper
             // Count dashes in input vs pattern to determine hierarchy levels
             const inputDashes = (input.match(/-/g) || []).length;
             const patternDashes = (pattern.match(/-/g) || []).length;
-            
+
             // Only show patterns that are exactly one level deeper (one more dash)
             return patternDashes === inputDashes + 1;
         }
