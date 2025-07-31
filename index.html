@@ -375,7 +375,7 @@
         // Check if input is a partial match (prefix) of a COT pattern
         function isPartialMatch(input, pattern) {
             if (input.length >= pattern.length) return false;
-            
+
             for (let i = 0; i < input.length; i++) {
                 if (pattern[i] === '.') {
                     // Wildcard matches any character
@@ -399,12 +399,12 @@
         // Find parent definition for a given COT code (recursively searches up hierarchy)
         function findParentDefinition(input) {
             let currentCode = input;
-            
+
             // Keep going up the hierarchy until we find a parent or run out of levels
             while (true) {
                 const parentCode = getParentCOTCode(currentCode);
                 if (!parentCode) return null; // No more parent levels
-                
+
                 // Search for this parent code in the data
                 for (const cot of cotData) {
                     try {
@@ -421,7 +421,7 @@
                         }
                     }
                 }
-                
+
                 // Parent not found at this level, try going up one more level
                 currentCode = parentCode;
                 console.log('Parent not found for:', parentCode, 'trying next level up');
@@ -464,17 +464,15 @@
             // Find parent definition
             const parentDefinition = findParentDefinition(inputTrimmed);
 
-            // Sort matches by match type (exact first) then by length (shortest first)
-            matches.sort((a, b) => {
-                if (a.matchType !== b.matchType) {
-                    return a.matchType === 'exact' ? -1 : 1;
-                }
-                return a.matchLength - b.matchLength;
-            });
-
             // Separate exact and partial matches
             const exactMatches = matches.filter(match => match.matchType === 'exact');
             const partialMatches = matches.filter(match => match.matchType === 'partial');
+
+            // Sort exact matches by length (shortest first)
+            exactMatches.sort((a, b) => a.matchLength - b.matchLength);
+
+            // Sort partial matches alphabetically by COT code
+            partialMatches.sort((a, b) => a.cot.localeCompare(b.cot));
 
             console.log('Total matches found:', matches.length, 'Parent:', parentDefinition ? 'found' : 'none');
             return { exact: exactMatches, partial: partialMatches, parent: parentDefinition };
