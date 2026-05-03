@@ -149,6 +149,12 @@
             font-size: 0.9rem;
         }
 
+        .match-reason {
+            color: #777;
+            font-size: 0.85rem;
+            margin-top: 6px;
+        }
+
         .loading {
             text-align: center;
             padding: 40px;
@@ -443,6 +449,34 @@
             return patternDashes === inputDashes + 1;
         }
 
+        function normalizeSearchText(value) {
+            return value
+                .toLowerCase()
+                .replace(/[^a-z0-9]+/g, ' ')
+                .trim();
+        }
+
+        function isLikelyCOTCode(input) {
+            const query = input.trim();
+            return /^[a-z0-9.-]+$/i.test(query) && (query.includes('-') || query.includes('.') || query.length <= 3);
+        }
+
+        function getTextMatchReason(cot, normalizedQuery) {
+            const fields = [
+                { label: 'Code', value: cot.cot },
+                { label: 'Description', value: cot.desc },
+                { label: 'Path', value: cot.full }
+            ];
+
+            for (const field of fields) {
+                if (normalizeSearchText(field.value).includes(normalizedQuery)) {
+                    return field.label;
+                }
+            }
+
+            return null;
+        }
+
         // Get parent COT code by removing the last segment (letter and dash)
         function getParentCOTCode(input) {
             const lastDashIndex = input.lastIndexOf('-');
@@ -483,36 +517,56 @@
 
         // Search for matching COT codes
         function searchCOT(input) {
-            if (!input.trim()) return { exact: [], partial: [], parent: null };
+            if (!input.trim()) return { exact: [], partial: [], text: [], parent: null };
 
             const matches = [];
             const inputTrimmed = input.trim();
             currentQuery = inputTrimmed; // Store current query for dot substitution
+            const normalizedQuery = normalizeSearchText(inputTrimmed);
+            const shouldRunCodeSearch = isLikelyCOTCode(inputTrimmed);
 
-            for (const cot of cotData) {
-                try {
-                    // First try exact regex match
-                    const regex = cotPatternToRegex(cot.cot);
-                    if (regex.test(inputTrimmed)) {
-                        matches.push({ ...cot, matchType: 'exact', matchLength: cot.cot.length });
-                        continue;
-                    }
+            if (shouldRunCodeSearch) {
+                for (const cot of cotData) {
+                    try {
+                        // First try exact regex match
+                        const regex = cotPatternToRegex(cot.cot);
+                        if (regex.test(inputTrimmed)) {
+                            matches.push({ ...cot, matchType: 'exact', matchLength: cot.cot.length });
+                            continue;
+                        }
 
-                    // Then try partial match (input is prefix of pattern)
-                    if (isPartialMatch(inputTrimmed, cot.cot)) {
-                        matches.push({ ...cot, matchType: 'partial', matchLength: cot.cot.length });
-                    }
-                } catch (error) {
-                    console.error('Regex error for pattern:', cot.cot, error);
-                    // If regex fails, fall back to exact match
-                    if (cot.cot.toLowerCase() === inputTrimmed.toLowerCase()) {
-                        matches.push({ ...cot, matchType: 'exact', matchLength: cot.cot.length });
+                        // Then try partial match (input is prefix of pattern)
+                        if (isPartialMatch(inputTrimmed, cot.cot)) {
+                            matches.push({ ...cot, matchType: 'partial', matchLength: cot.cot.length });
+                        }
+                    } catch (error) {
+                        console.error('Regex error for pattern:', cot.cot, error);
+                        // If regex fails, fall back to exact match
+                        if (cot.cot.toLowerCase() === inputTrimmed.toLowerCase()) {
+                            matches.push({ ...cot, matchType: 'exact', matchLength: cot.cot.length });
+                        }
                     }
                 }
             }
 
+            const textMatches = normalizedQuery ? cotData
+                .map(cot => {
+                    const reason = getTextMatchReason(cot, normalizedQuery);
+                    return reason ? { ...cot, matchType: 'text', matchReason: reason, matchLength: cot.cot.length } : null;
+                })
+                .filter(Boolean)
+                .filter(match => !matches.some(existing => existing.cot === match.cot))
+                .sort((a, b) => {
+                    const reasonOrder = { Description: 0, Path: 1, Code: 2 };
+                    const reasonDifference = reasonOrder[a.matchReason] - reasonOrder[b.matchReason];
+                    if (reasonDifference !== 0) {
+                        return reasonDifference;
+                    }
+                    return a.cot.localeCompare(b.cot);
+                }) : [];
+
             // Find parent definition
-            const parentDefinition = findParentDefinition(inputTrimmed);
+            const parentDefinition = shouldRunCodeSearch ? findParentDefinition(inputTrimmed) : null;
 
             // Separate exact and partial matches
             const exactMatches = matches.filter(match => match.matchType === 'exact');
@@ -524,7 +578,7 @@
             // Sort partial matches alphabetically by COT code
             partialMatches.sort((a, b) => a.cot.localeCompare(b.cot));
 
-            return { exact: exactMatches, partial: partialMatches, parent: parentDefinition };
+            return { exact: exactMatches, partial: partialMatches, text: textMatches, parent: parentDefinition };
         }
 
         // Display results
@@ -539,20 +593,22 @@
             const extensionsHeader = document.getElementById('extensionsHeader');
             const extensionsList = document.getElementById('extensionsList');
 
-            const { exact: exactMatches, partial: partialMatches, parent: parentDefinition } = matchData;
+            const { exact: exactMatches, partial: partialMatches, text: textMatches, parent: parentDefinition } = matchData;
+            const mainMatches = exactMatches.length > 0 ? exactMatches : textMatches;
 
             // Handle main results block
-            if (exactMatches.length === 0 && partialMatches.length === 0 && !parentDefinition) {
+            if (exactMatches.length === 0 && partialMatches.length === 0 && textMatches.length === 0 && !parentDefinition) {
                 resultsHeader.textContent = `No matches found for "${query}"`;
-                resultsList.innerHTML = '<div class="no-results">No COT definitions match your input. Try a different code or check your spelling.</div>';
+                resultsList.innerHTML = '<div class="no-results">No COT definitions match your input. Try a different code, unit type, or keyword.</div>';
                 resultsDiv.style.display = 'block';
                 parentDiv.style.display = 'none';
                 extensionsDiv.style.display = 'none';
             } else {
-                // Show exact matches in main block, or subtle "no exact matches" if only partials
-                if (exactMatches.length > 0) {
-                    resultsHeader.textContent = `Found ${exactMatches.length} matching COT definition${exactMatches.length === 1 ? '' : 's'} for "${query}"`;
-                    resultsList.innerHTML = exactMatches.map(match => {
+                // Show exact or text matches in main block, or subtle "no exact matches" if only partials
+                if (mainMatches.length > 0) {
+                    const isKeywordSearch = exactMatches.length === 0;
+                    resultsHeader.textContent = `Found ${mainMatches.length} matching COT definition${mainMatches.length === 1 ? '' : 's'} for "${query}"`;
+                    resultsList.innerHTML = mainMatches.map(match => {
                         const fullPath = buildFullPath(match.cot, match.full, currentQuery);
                         const displayCode = displayCotCode(match.cot, currentQuery);
                         return `
@@ -560,6 +616,7 @@
                                 <div class="cot-code">${displayCode}</div>
                                 <div class="cot-desc">${match.desc}</div>
                                 ${fullPath ? `<div class="cot-full">${fullPath}</div>` : ''}
+                                ${isKeywordSearch ? `<div class="match-reason">Matched ${match.matchReason.toLowerCase()}</div>` : ''}
                             </div>
                         `;
                     }).join('');
@@ -648,8 +705,8 @@
             const input = document.getElementById('cotInput');
             let query = input.value.trim();
 
-            // Auto-correct the input immediately
-            const correctedQuery = autoCorrectInput(query);
+            // Auto-correct code-like input immediately, but leave keyword searches alone.
+            const correctedQuery = isLikelyCOTCode(query) ? autoCorrectInput(query) : query;
             if (correctedQuery !== query) {
                 // Update the input field with corrected value
                 input.value = correctedQuery;
