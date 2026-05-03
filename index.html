@@ -69,6 +69,51 @@
             font-size: 1.1rem;
         }
 
+        .search-mode {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 8px;
+            margin-bottom: 18px;
+        }
+
+        .mode-option {
+            border: 1px solid #ddd;
+            border-radius: 8px;
+            background: white;
+            color: #444;
+            cursor: pointer;
+            padding: 12px;
+            text-align: left;
+            transition: all 0.2s ease;
+        }
+
+        .mode-option.active {
+            border-color: #667eea;
+            background: rgba(102, 126, 234, 0.08);
+            color: #333;
+        }
+
+        .mode-title {
+            display: block;
+            font-weight: 700;
+            line-height: 1.2;
+            margin-bottom: 4px;
+        }
+
+        .mode-desc {
+            display: block;
+            color: #666;
+            font-size: 0.85rem;
+            line-height: 1.35;
+        }
+
+        .field-help {
+            color: #666;
+            font-size: 0.9rem;
+            margin-bottom: 10px;
+            min-height: 1.35em;
+        }
+
         #cotInput {
             width: 100%;
             padding: 15px;
@@ -86,6 +131,12 @@
             outline: none;
             border-color: #667eea;
             box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
+        }
+
+        #cotInput.keyword-mode {
+            font-family: inherit;
+            letter-spacing: 0;
+            text-transform: none;
         }
 
         .example {
@@ -233,6 +284,10 @@
             .input-section {
                 padding: 20px;
             }
+
+            .search-mode {
+                grid-template-columns: 1fr;
+            }
         }
     </style>
 </head>
@@ -261,8 +316,19 @@
 
         <div class="input-section">
             <div class="input-group">
-                <label for="cotInput">Enter COT type:</label>
-                <input type="text" id="cotInput" placeholder="a-f-A-M-F-C-H" autocomplete="off" spellcheck="false">
+                <div class="search-mode" aria-label="Search mode">
+                    <button type="button" class="mode-option active" data-mode="description" id="descriptionMode">
+                        <span class="mode-title">Description</span>
+                        <span class="mode-desc">Search labels and paths like Armor, Engineer, or Artillery</span>
+                    </button>
+                    <button type="button" class="mode-option" data-mode="type" id="typeMode">
+                        <span class="mode-title">CoT type</span>
+                        <span class="mode-desc">Search codes like a-f-A-M-F-C-H or a-.-G-U-C</span>
+                    </button>
+                </div>
+                <label for="cotInput" id="inputLabel">Search descriptions and labels:</label>
+                <div class="field-help" id="fieldHelp">Matches COT descriptions, display labels, and full hierarchy paths.</div>
+                <input type="text" id="cotInput" class="keyword-mode" placeholder="Armor, Engineer, Artillery" autocomplete="off" spellcheck="false">
             </div>
         </div>
 
@@ -298,6 +364,7 @@
         let cotData = [];
         let isLoading = false;
         let currentQuery = '';
+        let searchMode = 'description';
 
         // Affiliation mappings for COT codes starting with "a-"
         const affiliations = {
@@ -390,6 +457,7 @@
 
         // Search for a specific COT code
         function searchForCode(cotCode) {
+            setSearchMode('type');
             const input = document.getElementById('cotInput');
             input.value = cotCode;
             input.focus();
@@ -468,14 +536,14 @@
 
         function shouldAutoCorrectInput(input) {
             const query = input.trim();
-            return isLikelyCOTCode(query) && !/^([a-z0-9]-)+[a-z0-9]$/i.test(query);
+            return /^[a-z0-9.-]+$/i.test(query) && !/^([a-z0-9]-)+[a-z0-9]$/i.test(query);
         }
 
         function getTextMatchReason(cot, normalizedQuery) {
             const fields = [
-                { label: 'Code', value: cot.cot },
                 { label: 'Description', value: cot.desc },
-                { label: 'Path', value: cot.full }
+                { label: 'Label path', value: cot.full },
+                { label: 'CoT type', value: cot.cot }
             ];
 
             for (const field of fields) {
@@ -485,6 +553,34 @@
             }
 
             return null;
+        }
+
+        function setSearchMode(mode) {
+            searchMode = mode;
+
+            document.querySelectorAll('.mode-option').forEach(button => {
+                const isActive = button.dataset.mode === mode;
+                button.classList.toggle('active', isActive);
+                button.setAttribute('aria-pressed', isActive ? 'true' : 'false');
+            });
+
+            const input = document.getElementById('cotInput');
+            const label = document.getElementById('inputLabel');
+            const help = document.getElementById('fieldHelp');
+
+            if (mode === 'type') {
+                label.textContent = 'Search by CoT type code:';
+                help.textContent = 'Use hyphenated COT codes. Wildcards in definitions are shown with dots.';
+                input.placeholder = 'a-f-A-M-F-C-H';
+                input.classList.remove('keyword-mode');
+            } else {
+                label.textContent = 'Search descriptions and labels:';
+                help.textContent = 'Matches COT descriptions, display labels, and full hierarchy paths.';
+                input.placeholder = 'Armor, Engineer, Artillery';
+                input.classList.add('keyword-mode');
+            }
+
+            handleInput();
         }
 
         // Get parent COT code by removing the last segment (letter and dash)
@@ -526,14 +622,15 @@
         }
 
         // Search for matching COT codes
-        function searchCOT(input) {
+        function searchCOT(input, mode = searchMode) {
             if (!input.trim()) return { exact: [], partial: [], text: [], parent: null };
 
             const matches = [];
             const inputTrimmed = input.trim();
             currentQuery = inputTrimmed; // Store current query for dot substitution
             const normalizedQuery = normalizeSearchText(inputTrimmed);
-            const shouldRunCodeSearch = isLikelyCOTCode(inputTrimmed);
+            const shouldRunCodeSearch = mode === 'type';
+            const shouldRunTextSearch = mode === 'description';
 
             if (shouldRunCodeSearch) {
                 for (const cot of cotData) {
@@ -559,7 +656,7 @@
                 }
             }
 
-            const textMatches = normalizedQuery ? cotData
+            const textMatches = shouldRunTextSearch && normalizedQuery ? cotData
                 .map(cot => {
                     const reason = getTextMatchReason(cot, normalizedQuery);
                     return reason ? { ...cot, matchType: 'text', matchReason: reason, matchLength: cot.cot.length } : null;
@@ -567,7 +664,7 @@
                 .filter(Boolean)
                 .filter(match => !matches.some(existing => existing.cot === match.cot))
                 .sort((a, b) => {
-                    const reasonOrder = { Description: 0, Path: 1, Code: 2 };
+                    const reasonOrder = { Description: 0, 'Label path': 1, 'CoT type': 2 };
                     const reasonDifference = reasonOrder[a.matchReason] - reasonOrder[b.matchReason];
                     if (reasonDifference !== 0) {
                         return reasonDifference;
@@ -609,7 +706,10 @@
             // Handle main results block
             if (exactMatches.length === 0 && partialMatches.length === 0 && textMatches.length === 0 && !parentDefinition) {
                 resultsHeader.textContent = `No matches found for "${query}"`;
-                resultsList.innerHTML = '<div class="no-results">No COT definitions match your input. Try a different code, unit type, or keyword.</div>';
+                    const noResultsText = searchMode === 'type'
+                        ? 'No COT definitions match that type code. Check the code format or try a parent code.'
+                        : 'No COT definitions match that description. Try a broader term, unit type, or label.';
+                    resultsList.innerHTML = `<div class="no-results">${noResultsText}</div>`;
                 resultsDiv.style.display = 'block';
                 parentDiv.style.display = 'none';
                 extensionsDiv.style.display = 'none';
@@ -716,7 +816,7 @@
             let query = input.value.trim();
 
             // Auto-correct code-like input immediately, but leave keyword searches alone.
-            const correctedQuery = shouldAutoCorrectInput(query) ? autoCorrectInput(query) : query;
+            const correctedQuery = searchMode === 'type' && shouldAutoCorrectInput(query) ? autoCorrectInput(query) : query;
             if (correctedQuery !== query) {
                 // Update the input field with corrected value
                 input.value = correctedQuery;
@@ -745,7 +845,7 @@
 
             // Debounce search
             searchTimeout = setTimeout(() => {
-                const matches = searchCOT(query);
+                const matches = searchCOT(query, searchMode);
                 displayResults(matches, query);
             }, 300);
         }
@@ -755,12 +855,17 @@
             await loadCOTData();
 
             const input = document.getElementById('cotInput');
+            document.querySelectorAll('.mode-option').forEach(button => {
+                button.addEventListener('click', () => setSearchMode(button.dataset.mode));
+                button.setAttribute('aria-pressed', button.dataset.mode === searchMode ? 'true' : 'false');
+            });
+
             input.addEventListener('input', handleInput);
             input.addEventListener('paste', () => {
                 setTimeout(() => {
                     // Immediately auto-correct pasted content
                     const pastedQuery = input.value.trim();
-                    const correctedQuery = shouldAutoCorrectInput(pastedQuery) ? autoCorrectInput(pastedQuery) : pastedQuery;
+                    const correctedQuery = searchMode === 'type' && shouldAutoCorrectInput(pastedQuery) ? autoCorrectInput(pastedQuery) : pastedQuery;
                     if (correctedQuery !== input.value.trim()) {
                         input.value = correctedQuery;
                         input.setSelectionRange(input.value.length, input.value.length);
