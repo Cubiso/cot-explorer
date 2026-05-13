@@ -10,7 +10,7 @@ set('default_stage', 'production');
 set('keep_releases', 3);
 
 host('production')
-    ->set('hostname', 'provisor.app')
+    ->set('hostname', 'jakobbuis.nl')
     ->set('remote_user', 'jakob')
     ->set('branch', 'main')
     ->set('deploy_path', '/srv/cot-explorer');
