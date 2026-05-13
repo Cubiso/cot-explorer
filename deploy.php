@@ -9,7 +9,7 @@ set('repository', 'git@github.com:Cubiso/cot-explorer.git');
 set('default_stage', 'production');
 set('keep_releases', 3);
 
-host('provisor.app')
+host('production')
     ->set('hostname', 'provisor.app')
     ->set('remote_user', 'jakob')
     ->set('branch', 'main')
