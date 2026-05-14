@@ -327,8 +327,10 @@
                     </button>
                 </div>
                 <label for="cotInput" id="inputLabel">Search descriptions and labels:</label>
-                <div class="field-help" id="fieldHelp">Matches COT descriptions, display labels, and full hierarchy paths.</div>
-                <input type="text" id="cotInput" class="keyword-mode" placeholder="Armor, Engineer, Artillery" autocomplete="off" spellcheck="false">
+                <div class="field-help" id="fieldHelp">Matches COT descriptions, display labels, and full hierarchy
+                    paths.</div>
+                <input type="text" id="cotInput" class="keyword-mode" placeholder="Armor, Engineer, Artillery"
+                    autocomplete="off" spellcheck="false">
             </div>
         </div>
 
@@ -731,10 +733,10 @@
             // Handle main results block
             if (exactMatches.length === 0 && partialMatches.length === 0 && textMatches.length === 0 && !parentDefinition) {
                 resultsHeader.textContent = `No matches found for "${query}"`;
-                    const noResultsText = searchMode === 'type'
-                        ? 'No COT definitions match that type code. Check the code format or try a parent code.'
-                        : 'No COT definitions match that description. Try a broader term, unit type, or label.';
-                    resultsList.innerHTML = `<div class="no-results">${noResultsText}</div>`;
+                const noResultsText = searchMode === 'type'
+                    ? 'No COT definitions match that type code. Check the code format or try a parent code.'
+                    : 'No COT definitions match that description. Try a broader term, unit type, or label.';
+                resultsList.innerHTML = `<div class="no-results">${noResultsText}</div>`;
                 resultsDiv.style.display = 'block';
                 parentDiv.style.display = 'none';
                 extensionsDiv.style.display = 'none';
