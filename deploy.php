@@ -10,7 +10,7 @@ set('default_stage', 'production');
 set('keep_releases', 3);
 
 host('production')
-    ->set('hostname', 'jakobbuis.nl')
+    ->set('hostname', '165.22.193.52')
     ->set('remote_user', 'jakob')
     ->set('branch', 'main')
     ->set('deploy_path', '/srv/cot-explorer');
