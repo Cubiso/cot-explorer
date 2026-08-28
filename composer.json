@@ -1,9 +1,6 @@
 {
     "name": "cubiso/cot-explainer",
     "type": "project",
-    "require-dev": {
-        "deployer/deployer": "^7.5"
-    },
     "license": "proprietary",
     "minimum-stability": "stable",
     "require": {}
